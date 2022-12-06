@@ -88,15 +88,15 @@ void multiply_base()
 	for(long i = 0; i < (long)SIZEX; i++){  // row
 		for(long j = 0; j < (long)SIZEY; j++){ // column
 			
-			long res = 0;
+			long total = 0;
 			
 			//multiply
 			for(long k = 0; k < (long)SIZEY; k++){
-					
-				res += (huge_matrixA[ARRAY(i,k)] * huge_matrixB[ARRAY(k,j)]);
+			
+				total += (huge_matrixA[ARRAY(i,k)] * huge_matrixB[ARRAY(k,j)]);
 			}
-
-			huge_matrixC[ARRAY(i,j)] = res;
+			//resulting matrix 
+			huge_matrixC[ARRAY(i,j)] = total;
 		}
 	}
 	
@@ -131,7 +131,20 @@ void write_results()
 
 void load_matrix()
 {
-	// Your code here
+	printf("load_matrix\n");
+	long i;
+	huge_matrixA = malloc(sizeof(long)*(long)SIZEX*(long)SIZEY); 
+	huge_matrixB = malloc(sizeof(long)*(long)SIZEX*(long)SIZEY);
+	huge_matrixC = malloc(sizeof(long)*(long)SIZEX*(long)SIZEY);
+	
+	// Load the input
+	// Note: This is suboptimal because each of these loads can be done in parallel.
+	for(i=0;i<((long)SIZEX*(long)SIZEY);i++)
+	{
+		fscanf(fin1,"%ld", (huge_matrixA+i)); 		
+		fscanf(fin2,"%ld", (huge_matrixB+i)); 		
+		huge_matrixC[i] = 0;		
+	}
 }
 
 
@@ -165,6 +178,7 @@ int main()
 	ftest = fopen("./reference.in","r");
 		
 	flush_all_caches();
+	
 	s = clock();
 	load_matrix_base();
 	t = clock();
@@ -178,7 +192,7 @@ int main()
 	total_mul_base += ((double)t-(double)s) / CLOCKS_PER_SEC;
 	printf("[Baseline] Total time taken during the multiply = %f seconds\n", total_mul_base);
 	
-	print_matrix();
+	
 	fclose(fin1);
 	fclose(fin2);
 	fclose(fout);
@@ -189,7 +203,7 @@ int main()
 	
 
 	/*
-	//flush_all_caches();
+	
 
 	s = clock();
 	load_matrix();
@@ -214,5 +228,19 @@ int main()
 
 	return 0;
 }
+
+
+// References 
+
+//multiply_base 
+//accessing indexes and printing
+//https://stackoverflow.com/questions/57324924/how-to-create-a-big-matrix-like-with-1000-rows-columns-in-c
+
+//Flushing the cache
+ 
+//https://stackoverflow.com/questions/11277984/how-to-flush-the-cpu-cache-in-linux-from-a-c-program
+//
+
+
 
 

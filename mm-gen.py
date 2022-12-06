@@ -4,7 +4,7 @@ import numpy as np
 import os,sys
 import random
 
-size = 3
+size = 1000
 f1 = open("input1.in","w")
 f2 = open("input2.in","w")
 f3 = open("reference.in","w")

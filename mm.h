@@ -1,5 +1,5 @@
-#define SIZEX 3
-#define SIZEY 3
+#define SIZEX 1000
+#define SIZEY 1000
 
 long * huge_matrixA;
 long * huge_matrixB;
@@ -19,9 +19,7 @@ void load_matrix();
 void multiply();
 
 // Any additional variables needed go here
-#define BUF 256
-long row = (long)SIZEX; // they are here because i dont waht to write them over and over
-long col = (long)SIZEY;
+
 
 // Any helper functions go here
 
