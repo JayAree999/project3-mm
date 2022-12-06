@@ -5,43 +5,42 @@
 #include <string.h>
 
 //for accessing matrices index
-#define ARRAY(n,m) ((n*(long)SIZEX)+m)
+#define ARRAY(n,m) [(n*(long)SIZEX)+m]
 
 //defined in mm.h
-// #define SIZEX 1000
-//#define SIZEY 1000
+// #define SIZEX 10
+//#define SIZEY 10
 
 
 // Task 1: Flush the cache so that we can do our measurement :)
 void flush_all_caches() {
 
 	
+	
 	const void *p;
-    const long *cp = (const long *)p;
-
+	const long * cp = (const long * )p;
     size_t i = 0;
     unsigned int allocation_size = (long)SIZEX*(long)SIZEY;
     
     if (p == NULL || allocation_size <= 0)
             return;
     
-  
 
      for (i = 0; i <  allocation_size ; i++) { // allocation size
      		
             asm volatile("clflush (%0)\n\t"
                          : 
-                         : "r"(huge_matrixA + i) // pointer to add
+                         : "r"(huge_matrixA + i) // 
                          : "memory");
 
             asm volatile("clflush (%0)\n\t"
                          : 
-                         : "r"(huge_matrixB + i) // pointer to add
+                         : "r"(huge_matrixB + i) //
                          : "memory");
                          
             asm volatile("clflush (%0)\n\t"
                          : 
-                         : "r"(huge_matrixC + i) // pointer to add
+                         : "r"(huge_matrixC + i) //
                          : "memory");
     	}
 
@@ -93,10 +92,11 @@ void multiply_base()
 			//multiply
 			for(long k = 0; k < (long)SIZEY; k++){
 			
-				total += (huge_matrixA[ARRAY(i,k)] * huge_matrixB[ARRAY(k,j)]);
-			}
+				total += (huge_matrixA ARRAY(i,k) * huge_matrixB ARRAY(k,j));
+			
 			//resulting matrix 
-			huge_matrixC[ARRAY(i,j)] = total;
+			huge_matrixC ARRAY(i,j) = total;
+			}
 		}
 	}
 	
@@ -149,10 +149,38 @@ void load_matrix()
 
 
 
-void multiply()
-{
-	// Your code here
-}
+void multiply() {
+ 	int bsize;// 
+ 	int i, j, k, kk, jj; // iterators
+ 	long n;
+
+
+ 	double sum;
+ 
+ 	bsize = 10;
+  	n = (long)SIZEX;
+
+
+ 	int en = bsize * (n/bsize); /* Amount that fits evenly into blocks */
+
+
+	// block size version from pdf
+
+ 	for (kk = 0; kk < en; kk += bsize) {
+		for (jj = 0; jj < en; jj += bsize) {
+			for (i = 0; i < n; i++) {
+				for (j = jj; j < jj + bsize; j++) {
+ 					sum = huge_matrixC ARRAY(i*(long)SIZEX,j) ;
+					for (k = kk; k < kk + bsize; k++) {
+ 						sum += (huge_matrixA ARRAY(i,k) * huge_matrixB ARRAY(k,j)) ;
+					}
+					huge_matrixC ARRAY(i,j) = sum;
+				}
+ 			}
+		}
+ 	}
+ }
+
 
 //for printing 
 void print_matrix(){
@@ -192,30 +220,40 @@ int main()
 	total_mul_base += ((double)t-(double)s) / CLOCKS_PER_SEC;
 	printf("[Baseline] Total time taken during the multiply = %f seconds\n", total_mul_base);
 	
-	
+	print_matrix();
 	fclose(fin1);
 	fclose(fin2);
 	fclose(fout);
-	free_all();
+		
+		
 	
 	flush_all_caches();
+	free_all();
 	
 	
-
-	/*
+	// Block Size Version
 	
-
+	fin1 = fopen("./input1.in","r");
+	fin2 = fopen("./input2.in","r");
+	fout = fopen("./out.in","w");
+	ftest = fopen("./reference.in","r");
+	
 	s = clock();
 	load_matrix();
 	t = clock();
 	total_in_your += ((double)t-(double)s) / CLOCKS_PER_SEC;
 	printf("Total time taken during the load = %f seconds\n", total_in_your);
 
+
+	
 	s = clock();
 	multiply();
 	t = clock();
 	total_mul_your += ((double)t-(double)s) / CLOCKS_PER_SEC;
 	printf("Total time taken during the multiply = %f seconds\n", total_mul_your);
+	
+	print_matrix();
+	
 	write_results();
 	
 	compare_results();
@@ -223,10 +261,9 @@ int main()
 	fclose(fin1);
 	fclose(fin2);
 	fclose(fout);
-	*/
-	
 
 	return 0;
+
 }
 
 
