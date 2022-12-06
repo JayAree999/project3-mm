@@ -4,11 +4,11 @@
 #include "mm.h"
 #include <string.h>
 
-//for accessing matrices index
+//for accessing matrice indexes
 #define ARRAY(n,m) [(n*(long)SIZEX)+m]
 
-//defined in mm.h
-// #define SIZEX 10
+//.h
+// #define SIZEX 10 
 //#define SIZEY 10
 
 
@@ -105,17 +105,23 @@ void multiply_base()
 void compare_results()
 {
 	fout = fopen("./out.in","r");
+	ftest = fopen("./reference.in","r");
 	long i;
 	long temp1, temp2;
 	for(i=0;i<((long)SIZEX*(long)SIZEY);i++)
 	{
 		fscanf(fout, "%ld", &temp1);
-		fscanf(fout, "%ld", &temp2);
+		fscanf(ftest, "%ld", &temp2);
 		if(temp1!=temp2)
 		{
 			printf("Wrong solution!");
 			exit(1);
 		}
+		else {
+			printf("Correct!");
+			exit(1);
+		}
+		
 	}
 	fclose(fout);
 	fclose(ftest);
@@ -127,6 +133,22 @@ void write_results()
 	//
 	// Basically, make sure the result is written on fout
 	// Each line represent value in the X-dimension of your matrix
+	
+	char buffer[256];
+	fout = fopen("./out.in","w");
+
+	// read from matrixC and write in fout
+	for( long i = 0; i < (long)SIZEX; i++){
+		for( long j = 0; j <(long)SIZEY; j++){
+
+			memset(buffer, '\0', 256);
+			sprintf(buffer, "%ld ", huge_matrixC ARRAY(i,j));
+			fwrite(buffer, sizeof(char), strlen(buffer), fout); //write a line to fout
+			
+		}
+		char* end = "\n"; // end of line
+		fwrite(end, sizeof(char), strlen(end), fout); //write new line
+	}
 }
 
 void load_matrix()
@@ -150,29 +172,38 @@ void load_matrix()
 
 
 void multiply() {
+	printf("multiply\n");
  	int bsize;// 
  	int i, j, k, kk, jj; // iterators
  	long n;
 
 
- 	double sum;
+ 	long sum;
  
- 	bsize = 10;
+ 	bsize = 6;
   	n = (long)SIZEX;
 
 
- 	int en = bsize * (n/bsize); /* Amount that fits evenly into blocks */
-
+ 	long en = bsize * (n/bsize); /* Amount that fits evenly into blocks */
+	printf("EN: %ld\n", en );
 
 	// block size version from pdf
-
+	for (i = 0; i < n; i++) {
+	 	for (j = 0; j < n; j++){
+	 		huge_matrixC ARRAY(i,j) = 0.0;
+		}
+	}
+	
  	for (kk = 0; kk < en; kk += bsize) {
 		for (jj = 0; jj < en; jj += bsize) {
 			for (i = 0; i < n; i++) {
 				for (j = jj; j < jj + bsize; j++) {
- 					sum = huge_matrixC ARRAY(i*(long)SIZEX,j) ;
+				
+ 					sum = huge_matrixC ARRAY(i,j);
+ 			
 					for (k = kk; k < kk + bsize; k++) {
- 						sum += (huge_matrixA ARRAY(i,k) * huge_matrixB ARRAY(k,j)) ;
+ 						sum += (huge_matrixA ARRAY(i,k)) * 
+ 						(huge_matrixB ARRAY(k,j)) ;
 					}
 					huge_matrixC ARRAY(i,j) = sum;
 				}
@@ -220,7 +251,6 @@ int main()
 	total_mul_base += ((double)t-(double)s) / CLOCKS_PER_SEC;
 	printf("[Baseline] Total time taken during the multiply = %f seconds\n", total_mul_base);
 	
-	print_matrix();
 	fclose(fin1);
 	fclose(fin2);
 	fclose(fout);
@@ -252,15 +282,16 @@ int main()
 	total_mul_your += ((double)t-(double)s) / CLOCKS_PER_SEC;
 	printf("Total time taken during the multiply = %f seconds\n", total_mul_your);
 	
-	print_matrix();
+
 	
 	write_results();
 	
-	compare_results();
 	
 	fclose(fin1);
 	fclose(fin2);
 	fclose(fout);
+	free_all();
+	compare_results();
 
 	return 0;
 
