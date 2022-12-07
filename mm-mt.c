@@ -29,43 +29,41 @@ int head = 0;
 int tail = 0; 
 int workCount = 0;
 // Mutex and Conditional variables
-pthread_t* workers;
+
 pthread_mutex_t mutexParse;
 pthread_mutex_t mutexQ;
 pthread_cond_t condQ;
 
 
 void addJob(blockInfo data) {
-    pthread_mutex_lock(&mutexQ);
-    if (workCount < qSize) {
-        work_q[tail] = data;
-        tail = (tail+1) % qSize;
-        workCount++;
-    }
+     pthread_mutex_lock(&mutexQ);
+    work_q[workCount] = data;
+    workCount++;
     pthread_mutex_unlock(&mutexQ);
     pthread_cond_signal(&condQ);
 }
 
 
-int removeJob(blockInfo* data) {
-    int success = (workCount) ? 1 : 0;
-    if (success) {
-        *data = work_q[head];
-        head = (head+1) % qSize;
-        workCount--;
-    }
-    return success;
-}
+
 void* start_thread(void* args) {
     while(1) {
    	
-   	
+   
         pthread_mutex_lock(&mutexQ);
         blockInfo data;
-        while (!removeJob(&data)) {
+  
+        while (workCount == 0) {
             pthread_cond_wait(&condQ, &mutexQ);
         }
+        data = work_q[0];
+        for (int i = 0; i < workCount - 1; i++) {
+            work_q[i] = work_q[i + 1];
+        }
+        workCount--;
+
         pthread_mutex_unlock(&mutexQ);
+	
+        
     
         if (data.shutdown < 0) break;
         
@@ -239,6 +237,7 @@ void multiply(){
 
 
   // Initializing mutex and conditional variables
+      pthread_t t[MAX_THREADS];
     pthread_mutex_init(&mutexQ, NULL);
     pthread_mutex_init(&mutexParse, NULL);
     pthread_cond_init(&condQ, NULL);
@@ -247,15 +246,14 @@ void multiply(){
     blockInfo q[qSize*10];
     work_q = q;
     // Initializing threads
-    pthread_t temp[MAX_THREADS];
-    workers = temp;
+
     for (int i=0; i<MAX_THREADS; i++) {
-        if (pthread_create(&workers[i], NULL, &start_thread, NULL) != 0) {
+        if (pthread_create(&t[i], NULL, &start_thread, NULL) != 0) {
             perror("Thread creation failed");
-            exit(EXIT_FAILURE);   
+              
         }
     }
-    printf("ADD BLOCK\n");
+  
     //add threading block
 	
 	for(long i = 0; i < (long)SIZEX; i += BLOCK_SIZE){
@@ -270,21 +268,21 @@ void multiply(){
 		}
 	}
 	
-    	printf("FINISH ADD\n");
+
 
 	
 	//-----------------------------DONE THREADING------------------------------
-	 for (int i=0; i<MAX_THREADS; i++) {
-		blockInfo data;
-		data.shutdown = -1;
-		addJob(data);
-	    }
-
+	
+    	blockInfo poison;
+	poison.shutdown = -1;
+	for(int i = 0; i < MAX_THREADS; i++){
+		addJob(poison);
+	}
 	//after finish above destroy
 	for (int i = 0; i < MAX_THREADS; i++) {
-        if (pthread_join(workers[i], NULL) != 0) {
+        	if (pthread_join(t[i], NULL) != 0) {
             perror("Failed to join the thread");
-        }
+        	}
     	}
 	
     pthread_mutex_destroy(&mutexQ);
@@ -292,10 +290,9 @@ void multiply(){
     pthread_cond_destroy(&condQ);
     printf("Exiting...\n");
   
-
 }
+
 void block_multiply(int bsize, int row, int column) {
-	printf("block_multiply\n");
 	
  	int i, j, k, kk, jj; // iterators
 
@@ -309,8 +306,8 @@ void block_multiply(int bsize, int row, int column) {
 
 	for (kk = 0; kk < en; kk += bsize) {
 		for (jj = 0; jj < en; jj += bsize) {
-			for (i = 0; i < (long)SIZEX; i++) {
-				for (j = 0; j < jj + bsize; j++) {
+			for (i = row; i < (long)SIZEX; i++) {
+				for (j = column; j < jj + bsize; j++) {
 				
  					sum = huge_matrixC[ARRAY(i,j)];
  			
@@ -397,7 +394,6 @@ int main()
 	t = clock();
 	total_mul_your += ((double)t-(double)s) / CLOCKS_PER_SEC;
 	printf("Total time taken during the multiply = %f seconds\n", total_mul_your);
-	print_matrix();
 	
 
 	
