@@ -3,13 +3,78 @@
 #include<time.h>
 #include "mm.h"
 #include <string.h>
+#include <pthread.h>
+#include "mm-mt.h"
 
-//for accessing matrice indexes
-#define ARRAY(n,m) [(n*(long)SIZEX)+m]
+#define MAX_THREADS 4
+#define BLOCK_SIZE 6
+//for accessing matrice indexes row/column
+#define ARRAY(n,m) ((n*(long)SIZEX)+m)
+typedef struct blockInfo{
+    int blocksize;
+    int row;
+    int col;
+    int shutdown;
+} blockInfo;
+
 
 //.h
-// #define SIZEX 10 
-//#define SIZEY 10
+// #define SIZEX 30
+//#define SIZEY 30
+
+// Work queue
+blockInfo* work_q;
+int qSize;
+int head = 0;
+int tail = 0; 
+int workCount = 0;
+// Mutex and Conditional variables
+pthread_t* workers;
+pthread_mutex_t mutexParse;
+pthread_mutex_t mutexQ;
+pthread_cond_t condQ;
+
+
+void addJob(blockInfo data) {
+    pthread_mutex_lock(&mutexQ);
+    if (workCount < qSize) {
+        work_q[tail] = data;
+        tail = (tail+1) % qSize;
+        workCount++;
+    }
+    pthread_mutex_unlock(&mutexQ);
+    pthread_cond_signal(&condQ);
+}
+
+
+int removeJob(blockInfo* data) {
+    int success = (workCount) ? 1 : 0;
+    if (success) {
+        *data = work_q[head];
+        head = (head+1) % qSize;
+        workCount--;
+    }
+    return success;
+}
+void* start_thread(void* args) {
+    while(1) {
+   	
+   	
+        pthread_mutex_lock(&mutexQ);
+        blockInfo data;
+        while (!removeJob(&data)) {
+            pthread_cond_wait(&condQ, &mutexQ);
+        }
+        pthread_mutex_unlock(&mutexQ);
+    
+        if (data.shutdown < 0) break;
+        
+        block_multiply(data.blocksize,data.row,data.col);
+
+    }
+    return NULL;
+}
+
 
 
 // Task 1: Flush the cache so that we can do our measurement :)
@@ -92,10 +157,10 @@ void multiply_base()
 			//multiply
 			for(long k = 0; k < (long)SIZEY; k++){
 			
-				total += (huge_matrixA ARRAY(i,k) * huge_matrixB ARRAY(k,j));
+				total += (huge_matrixA[ ARRAY(i,k)] * huge_matrixB[ARRAY(k,j)]);
 			
 			//resulting matrix 
-			huge_matrixC ARRAY(i,j) = total;
+			huge_matrixC[ ARRAY(i,j)] = total;
 			}
 		}
 	}
@@ -142,7 +207,7 @@ void write_results()
 		for( long j = 0; j <(long)SIZEY; j++){
 
 			memset(buffer, '\0', 256);
-			sprintf(buffer, "%ld ", huge_matrixC ARRAY(i,j));
+			sprintf(buffer, "%ld ", huge_matrixC [ARRAY(i,j)]);
 			fwrite(buffer, sizeof(char), strlen(buffer), fout); //write a line to fout
 			
 		}
@@ -170,42 +235,90 @@ void load_matrix()
 }
 
 
-
-void multiply() {
-	printf("multiply\n");
- 	int bsize;// 
- 	int i, j, k, kk, jj; // iterators
- 	long n;
+void multiply(){
 
 
- 	long sum;
- 
- 	bsize = 6;
-  	n = (long)SIZEX;
+  // Initializing mutex and conditional variables
+    pthread_mutex_init(&mutexQ, NULL);
+    pthread_mutex_init(&mutexParse, NULL);
+    pthread_cond_init(&condQ, NULL);
 
-
- 	long en = bsize * (n/bsize); /* Amount that fits evenly into blocks */
-	printf("EN: %ld\n", en );
-
-	// block size version from pdf
-	for (i = 0; i < n; i++) {
-	 	for (j = 0; j < n; j++){
-	 		huge_matrixC ARRAY(i,j) = 0.0;
+    qSize = MAX_THREADS;
+    blockInfo q[qSize*10];
+    work_q = q;
+    // Initializing threads
+    pthread_t temp[MAX_THREADS];
+    workers = temp;
+    for (int i=0; i<MAX_THREADS; i++) {
+        if (pthread_create(&workers[i], NULL, &start_thread, NULL) != 0) {
+            perror("Thread creation failed");
+            exit(EXIT_FAILURE);   
+        }
+    }
+    printf("ADD BLOCK\n");
+    //add threading block
+	
+	for(long i = 0; i < (long)SIZEX; i += BLOCK_SIZE){
+		for(long j = 0; j < (long)SIZEY; j += BLOCK_SIZE){
+				blockInfo block;
+			  	block.blocksize= BLOCK_SIZE;
+				block.row=i;
+				block.col=j;
+				block.shutdown = 1;
+				addJob(block);
+			
 		}
 	}
 	
- 	for (kk = 0; kk < en; kk += bsize) {
+    	printf("FINISH ADD\n");
+
+	
+	//-----------------------------DONE THREADING------------------------------
+	 for (int i=0; i<MAX_THREADS; i++) {
+		blockInfo data;
+		data.shutdown = -1;
+		addJob(data);
+	    }
+
+	//after finish above destroy
+	for (int i = 0; i < MAX_THREADS; i++) {
+        if (pthread_join(workers[i], NULL) != 0) {
+            perror("Failed to join the thread");
+        }
+    	}
+	
+    pthread_mutex_destroy(&mutexQ);
+    pthread_mutex_destroy(&mutexParse);
+    pthread_cond_destroy(&condQ);
+    printf("Exiting...\n");
+  
+
+}
+void block_multiply(int bsize, int row, int column) {
+	printf("block_multiply\n");
+	
+ 	int i, j, k, kk, jj; // iterators
+
+ 
+ 	double sum;
+ 	int en = bsize * ((long)SIZEX/bsize); /* Amount that fits evenly into blocks */
+
+	
+	// block size version from pdf
+	
+
+	for (kk = 0; kk < en; kk += bsize) {
 		for (jj = 0; jj < en; jj += bsize) {
-			for (i = 0; i < n; i++) {
-				for (j = jj; j < jj + bsize; j++) {
+			for (i = 0; i < (long)SIZEX; i++) {
+				for (j = 0; j < jj + bsize; j++) {
 				
- 					sum = huge_matrixC ARRAY(i,j);
+ 					sum = huge_matrixC[ARRAY(i,j)];
  			
 					for (k = kk; k < kk + bsize; k++) {
- 						sum += (huge_matrixA ARRAY(i,k)) * 
- 						(huge_matrixB ARRAY(k,j)) ;
+ 						sum += (huge_matrixA [ARRAY(i,k)]) * 
+ 						(huge_matrixB [ARRAY(k,j)]) ;
 					}
-					huge_matrixC ARRAY(i,j) = sum;
+					huge_matrixC [ARRAY(i,j)] = sum;
 				}
  			}
 		}
@@ -222,6 +335,7 @@ void print_matrix(){
     }
     printf("\n");
 }
+
 
 int main()
 {
@@ -246,6 +360,7 @@ int main()
 	
 	
 	s = clock();
+	
 	multiply_base();
 	t = clock();
 	total_mul_base += ((double)t-(double)s) / CLOCKS_PER_SEC;
@@ -261,7 +376,7 @@ int main()
 	free_all();
 	
 	
-	// Block Size Version
+	// Block Size / Threading Version
 	
 	fin1 = fopen("./input1.in","r");
 	fin2 = fopen("./input2.in","r");
@@ -275,12 +390,14 @@ int main()
 	printf("Total time taken during the load = %f seconds\n", total_in_your);
 
 
-	
 	s = clock();
+	
 	multiply();
+
 	t = clock();
 	total_mul_your += ((double)t-(double)s) / CLOCKS_PER_SEC;
 	printf("Total time taken during the multiply = %f seconds\n", total_mul_your);
+	print_matrix();
 	
 
 	
@@ -293,6 +410,9 @@ int main()
 	free_all();
 	compare_results();
 
+    
+    
+    	printf("Exiting...\n");
 	return 0;
 
 }

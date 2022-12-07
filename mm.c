@@ -300,13 +300,18 @@ int main()
 
 // References 
 
-//multiply_base 
+//Multiply_base 
 //accessing indexes and printing
 //https://stackoverflow.com/questions/57324924/how-to-create-a-big-matrix-like-with-1000-rows-columns-in-c
 
 //Flushing the cache
- 
 //https://stackoverflow.com/questions/11277984/how-to-flush-the-cpu-cache-in-linux-from-a-c-program
+
+//Blocked Matrix Multiply 
+// http://csapp.cs.cmu.edu/3e/waside/
+
+//Write to out.in
+
 //
 
 
